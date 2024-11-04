@@ -40,6 +40,9 @@ var Eye = vec3.clone(defaultEye); // eye position in world space
 var Center = vec3.clone(defaultCenter); // view direction in world space
 var Up = vec3.clone(defaultUp); // view up vector in world space
 
+//Texture buffers
+var textures = [];
+
 // ASSIGNMENT HELPER FUNCTIONS
 
 // get the JSON file from the passed URL
@@ -246,7 +249,7 @@ function setupWebGL() {
       imageContext = imageCanvas.getContext("2d"); 
       var bkgdImage = new Image(); 
       bkgdImage.crossOrigin = "Anonymous";
-      bkgdImage.src = "https://ncsucgclass.github.io/prog3/sky.jpg";
+      bkgdImage.src = "https://ncsucgclass.github.io/prog4/sky.jpg";
       bkgdImage.onload = function(){
           var iw = bkgdImage.width, ih = bkgdImage.height;
           imageContext.drawImage(bkgdImage,0,0,iw,ih,0,0,cw,ch);   
@@ -334,6 +337,7 @@ function loadTexture(gl, url) {
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         }
     };
+    image.crossOrigin = "";
     image.src = url;
 
     return texture;
@@ -426,7 +430,6 @@ function loadModels() {
     } // end make ellipsoid
     
     inputTriangles = getJSONFile(INPUT_TRIANGLES_URL,"triangles"); // read in the triangle data
-
     try {
         if (inputTriangles == String.null)
             throw "Unable to load triangles file!";
@@ -496,12 +499,11 @@ function loadModels() {
             } // end for each triangle set 
         
             // inputEllipsoids = getJSONFile(INPUT_ELLIPSOIDS_URL,"ellipsoids"); // read in the ellipsoids
-            inputEllipsoids = String.null;
+            inputEllipsoids = [];
 
             if (inputEllipsoids == String.null)
                 throw "Unable to load ellipsoids file!";
             else {
-                
                 // init ellipsoid highlighting, translation and rotation; update bbox
                 var ellipsoid; // current ellipsoid
                 var ellipsoidModel; // current ellipsoid triangular model
@@ -815,17 +817,14 @@ function renderModels() {
 } // end render model
 
 /* MAIN -- HERE is where execution begins after window load */
-var texture;
 function main() {
 
     setupWebGL(); // set up the webGL environment
-    textures = [
-        loadTexture(gl, "abe.png"),
-        loadTexture(gl, "tree.png"),
-        loadTexture(gl, "billie.jpg"),
-    ]
     loadModels(); // load in the models from tri file
     setupShaders(); // setup the webGL shaders
+    for (var i = 0; i < numTriangleSets; i++) {
+        textures[i] = loadTexture(gl, "https://ncsucgclass.github.io/prog4/" + inputTriangles[i].material.texture);
+    }
     renderModels(); // draw the triangles using webGL
   
 } // end main
