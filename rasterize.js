@@ -1,7 +1,7 @@
 /* GLOBAL CONSTANTS AND VARIABLES */
 
 /* assignment specific globals */
-const INPUT_TRIANGLES_URL = "https://ncsucgclass.github.io/prog3/triangles.json"; // triangles file loc
+const INPUT_TRIANGLES_URL = "https://ncsucgclass.github.io/prog4/triangles.json"; // triangles file loc
 const INPUT_ELLIPSOIDS_URL = "https://ncsucgclass.github.io/prog3/ellipsoids.json"; // ellipsoids file loc
 var defaultEye = vec3.fromValues(0.5,0.5,-0.5); // default eye position in world space
 var defaultCenter = vec3.fromValues(0.5,0.5,0.5); // default view direction in world space
@@ -417,7 +417,7 @@ function loadModels() {
 
             } // end for each triangle set 
         
-            inputEllipsoids = getJSONFile(INPUT_ELLIPSOIDS_URL,"ellipsoids"); // read in the ellipsoids
+            // inputEllipsoids = getJSONFile(INPUT_ELLIPSOIDS_URL,"ellipsoids"); // read in the ellipsoids
 
             if (inputEllipsoids == String.null)
                 throw "Unable to load ellipsoids file!";
@@ -719,9 +719,9 @@ function renderModels() {
 
 function main() {
   
-  setupWebGL(); // set up the webGL environment
-  loadModels(); // load in the models from tri file
-  setupShaders(); // setup the webGL shaders
-  renderModels(); // draw the triangles using webGL
+    setupWebGL(); // set up the webGL environment
+    loadModels(); // load in the models from tri file
+    setupShaders(); // setup the webGL shaders
+    renderModels(); // draw the triangles using webGL
   
 } // end main
