@@ -264,36 +264,84 @@ function setupWebGL() {
         //gl.clearColor(0.0, 0.0, 0.0, 1.0); // use black when we clear the frame buffer
         gl.clearDepth(1.0); // use max when we clear the depth buffer
         gl.enable(gl.DEPTH_TEST); // use hidden surface removal (with zbuffering)
+          gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
       }
     } // end try
     
     catch(e) {
       console.log(e);
     } // end catch
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-
-    // Create a texture.
-    var texture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-
-    // Fill the texture with a 1x1 blue pixel.
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
-        new Uint8Array([0, 0, 255, 255]));
-
-    // Asynchronously load an image
-    var image = new Image();
-    image.src = "abe.png";
-    image.addEventListener('load', function() {
-        // Now that the image has loaded make copy it to the texture.
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA,gl.UNSIGNED_BYTE, image);
-        gl.generateMipmap(gl.TEXTURE_2D);
-    });
 
 
 } // end setupWebGL
 
+//
+// Initialize a texture and load an image.
+// When the image finished loading copy it into the texture.
+//
+function loadTexture(gl, url) {
+    const texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
 
+    // Because images have to be downloaded over the internet
+    // they might take a moment until they are ready.
+    // Until then put a single pixel in the texture so we can
+    // use it immediately. When the image has finished downloading
+    // we'll update the texture with the contents of the image.
+    const level = 0;
+    const internalFormat = gl.RGBA;
+    const width = 1;
+    const height = 1;
+    const border = 0;
+    const srcFormat = gl.RGBA;
+    const srcType = gl.UNSIGNED_BYTE;
+    const pixel = new Uint8Array([0, 0, 255, 255]); // opaque blue
+    gl.texImage2D(
+        gl.TEXTURE_2D,
+        level,
+        internalFormat,
+        width,
+        height,
+        border,
+        srcFormat,
+        srcType,
+        pixel,
+    );
+
+    const image = new Image();
+    image.onload = () => {
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(
+            gl.TEXTURE_2D,
+            level,
+            internalFormat,
+            srcFormat,
+            srcType,
+            image,
+        );
+
+        // WebGL1 has different requirements for power of 2 images
+        // vs. non power of 2 images so check if the image is a
+        // power of 2 in both dimensions.
+        if (isPowerOf2(image.width) && isPowerOf2(image.height)) {
+            // Yes, it's a power of 2. Generate mips.
+            gl.generateMipmap(gl.TEXTURE_2D);
+        } else {
+            // No, it's not a power of 2. Turn off mips and set
+            // wrapping to clamp to edge
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        }
+    };
+    image.src = url;
+
+    return texture;
+}
+
+function isPowerOf2(value) {
+    return (value & (value - 1)) === 0;
+}
 
 // read models in, load them into webgl buffers
 function loadModels() {
@@ -560,7 +608,7 @@ function setupShaders() {
         
         //Texture properties
         varying vec2 v_texcoord;
-        uniform sampler2D u_texture;
+        uniform sampler2D uSampler;
             
         void main(void) {
         
@@ -582,7 +630,7 @@ function setupShaders() {
             // combine to output color
             vec3 colorOut = ambient + diffuse + specular; // no specular yet
             // gl_FragColor = vec4(colorOut, 1.0);
-             gl_FragColor = texture2D(u_texture, v_texcoord);
+             gl_FragColor = texture2D(uSampler, v_texcoord) * vec4(colorOut, 1.0);
         }
     `;
     
@@ -624,6 +672,8 @@ function setupShaders() {
                 // locate vertex uniforms
                 mMatrixULoc = gl.getUniformLocation(shaderProgram, "umMatrix"); // ptr to mmat
                 pvmMatrixULoc = gl.getUniformLocation(shaderProgram, "upvmMatrix"); // ptr to pvmmat
+                uSampler = gl.getUniformLocation(shaderProgram, "uSampler");
+
                 
                 // locate fragment uniforms
                 var eyePositionULoc = gl.getUniformLocation(shaderProgram, "uEyePosition"); // ptr to eye position
@@ -724,7 +774,9 @@ function renderModels() {
         gl.vertexAttribPointer(vNormAttribLoc,3,gl.FLOAT,false,0,0); // feed
         gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffers[whichTriSet]);
         gl.vertexAttribPointer(texCoordLoc,2,gl.FLOAT,false,0,0); // feed
-        // setTexcoords(gl);
+        gl.activeTexture(gl.TEXTURE0 + whichTriSet);
+        gl.bindTexture(gl.TEXTURE_2D, textures[whichTriSet]);
+        gl.uniform1i(uSampler, whichTriSet);
 
         // triangle buffer: activate and render
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,triangleBuffers[whichTriSet]); // activate
@@ -762,12 +814,16 @@ function renderModels() {
     } // end for each ellipsoid
 } // end render model
 
-
 /* MAIN -- HERE is where execution begins after window load */
-
+var texture;
 function main() {
-  
+
     setupWebGL(); // set up the webGL environment
+    textures = [
+        loadTexture(gl, "abe.png"),
+        loadTexture(gl, "tree.png"),
+        loadTexture(gl, "billie.jpg"),
+    ]
     loadModels(); // load in the models from tri file
     setupShaders(); // setup the webGL shaders
     renderModels(); // draw the triangles using webGL
