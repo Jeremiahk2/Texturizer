@@ -33,6 +33,7 @@ var ambientULoc; // where to put ambient reflecivity for fragment shader
 var diffuseULoc; // where to put diffuse reflecivity for fragment shader
 var specularULoc; // where to put specular reflecivity for fragment shader
 var shininessULoc; // where to put specular exponent for fragment shader
+var alphaLoc
 var texCoordLoc;
 
 /* interaction variables */
@@ -264,7 +265,6 @@ function setupWebGL() {
       if (gl == null) {
         throw "unable to create gl context -- is your browser gl ready?";
       } else {
-        //gl.clearColor(0.0, 0.0, 0.0, 1.0); // use black when we clear the frame buffer
         gl.clearDepth(1.0); // use max when we clear the depth buffer
         gl.enable(gl.DEPTH_TEST); // use hidden surface removal (with zbuffering)
           gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
@@ -332,9 +332,12 @@ function loadTexture(gl, url) {
         } else {
             // No, it's not a power of 2. Turn off mips and set
             // wrapping to clamp to edge
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            // gl.NEAREST is also allowed, instead of gl.LINEAR, as neither mipmap.
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            // Prevents s-coordinate wrapping (repeating).
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            // Prevents t-coordinate wrapping (repeating).
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         }
     };
     image.crossOrigin = "";
@@ -430,6 +433,9 @@ function loadModels() {
     } // end make ellipsoid
     
     inputTriangles = getJSONFile(INPUT_TRIANGLES_URL,"triangles"); // read in the triangle data
+
+    inputTriangles.sort((a, b) => b.material.alpha - a.material.alpha)
+
     try {
         if (inputTriangles == String.null)
             throw "Unable to load triangles file!";
@@ -605,6 +611,7 @@ function setupShaders() {
         uniform vec3 uDiffuse; // the diffuse reflectivity
         uniform vec3 uSpecular; // the specular reflectivity
         uniform float uShininess; // the specular exponent
+        uniform float uAlpha; //The alpha (transparency) component.
         
         // geometry properties
         varying vec3 vWorldPos; // world xyz of fragment
@@ -633,8 +640,12 @@ function setupShaders() {
             
             // combine to output color
             vec3 colorOut = ambient + diffuse + specular; // no specular yet
-            // gl_FragColor = vec4(colorOut, 1.0);
-             gl_FragColor = texture2D(uSampler, v_texcoord) * vec4(colorOut, 1.0);
+            vec4 texColor = texture2D(uSampler, v_texcoord);
+            vec4 finalColor = texColor * vec4(colorOut, uAlpha);
+            if (texColor.a <= 0.5) {
+                discard;
+            }
+            gl_FragColor = finalColor;
         }
     `;
     
@@ -689,6 +700,7 @@ function setupShaders() {
                 diffuseULoc = gl.getUniformLocation(shaderProgram, "uDiffuse"); // ptr to diffuse
                 specularULoc = gl.getUniformLocation(shaderProgram, "uSpecular"); // ptr to specular
                 shininessULoc = gl.getUniformLocation(shaderProgram, "uShininess"); // ptr to shininess
+                alphaLoc = gl.getUniformLocation(shaderProgram, "uAlpha");
                 
                 // pass global constants into fragment uniforms
                 gl.uniform3fv(eyePositionULoc,Eye); // pass in the eye's position
@@ -746,6 +758,7 @@ function renderModels() {
     window.requestAnimationFrame(renderModels); // set up frame render callback
     
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // clear frame/depth buffers
+
     
     // set up projection and view
     // mat4.fromScaling(hMatrix,vec3.fromValues(-1,1,1)); // create handedness matrix
@@ -756,6 +769,8 @@ function renderModels() {
 
     // render each triangle set
     var currSet; // the tri set and its material properties
+    var numTransparent = 0;
+    gl.depthMask(true);
     for (var whichTriSet=0; whichTriSet<numTriangleSets; whichTriSet++) {
         currSet = inputTriangles[whichTriSet];
         
@@ -770,6 +785,7 @@ function renderModels() {
         gl.uniform3fv(diffuseULoc,currSet.material.diffuse); // pass in the diffuse reflectivity
         gl.uniform3fv(specularULoc,currSet.material.specular); // pass in the specular reflectivity
         gl.uniform1f(shininessULoc,currSet.material.n); // pass in the specular exponent
+        gl.uniform1f(alphaLoc, currSet.material.alpha);
         
         // vertex buffer: activate and feed into vertex shader
         gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffers[whichTriSet]); // activate
@@ -781,6 +797,13 @@ function renderModels() {
         gl.activeTexture(gl.TEXTURE0 + whichTriSet);
         gl.bindTexture(gl.TEXTURE_2D, textures[whichTriSet]);
         gl.uniform1i(uSampler, whichTriSet);
+
+        if (currSet.material.alpha <= .5) {
+            if (numTransparent === 0) {
+                gl.depthMask(false);
+                numTransparent++;
+            }
+        }
 
         // triangle buffer: activate and render
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,triangleBuffers[whichTriSet]); // activate
@@ -805,6 +828,7 @@ function renderModels() {
         gl.uniform3fv(diffuseULoc,ellipsoid.diffuse); // pass in the diffuse reflectivity
         gl.uniform3fv(specularULoc,ellipsoid.specular); // pass in the specular reflectivity
         gl.uniform1f(shininessULoc,ellipsoid.n); // pass in the specular exponent
+        gl.uniform1fv(alphaLoc, ellipsoid.alpha);
 
         gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffers[numTriangleSets+whichEllipsoid]); // activate vertex buffer
         gl.vertexAttribPointer(vPosAttribLoc,3,gl.FLOAT,false,0,0); // feed vertex buffer to shader
