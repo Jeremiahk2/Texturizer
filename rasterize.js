@@ -581,7 +581,9 @@ function setupShaders() {
             vVertexNormal = normalize(vec3(vWorldNormal4.x,vWorldNormal4.y,vWorldNormal4.z)); 
             
             //Pass the texcoord to the fragment shader
-            v_texcoord = a_texcoord;
+            vec2 altered_texcoord = a_texcoord;
+            altered_texcoord.x = 1.0 - altered_texcoord.x;
+            v_texcoord = altered_texcoord;
         }
     `;
     
