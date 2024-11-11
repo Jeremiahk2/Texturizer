@@ -12,6 +12,9 @@ var lightSpecular = vec3.fromValues(1,1,1); // default light specular emission
 var lightPosition = vec3.fromValues(-0.5,1.5,-0.5); // default light position
 var rotateTheta = Math.PI/50; // how much to rotate models by with each key press
 
+var background = "https://ncsucgclass.github.io/prog4/sky.jpg";
+var alternate = false;
+
 /* webgl and geometry data */
 var gl = null; // the all powerful gl object. It's all here folks!
 var inputTriangles = []; // the triangle data as loaded from input files
@@ -250,9 +253,21 @@ function handleKeyDown(event) {
             else {
                 colorMultiplier = 1.0;
             }
+            break;
+        case "Digit1":
+            if (event.getModifierState("Shift")) {
+                bkgdImage.src = "https://hips.hearstapps.com/hmg-prod/images/the-classic-mystery-machine-replica-van-built-by-jerry-news-photo-1587131341.jpg"
+                colorMultiplier = 0.0;
+                alternate = true;
+                loadModels();
+                for (var i = 0; i < numTriangleSets; i++) {
+                    textures[i] = loadTexture(gl, inputTriangles[i].material.texture);
+                }
+            }
+            break;
     } // end switch
 } // end handleKeyDown
-
+var bkgdImage = new Image();
 // set up the webGL environment
 function setupWebGL() {
     
@@ -261,10 +276,9 @@ function setupWebGL() {
 
     var imageCanvas = document.getElementById("myImageCanvas"); // create a 2d canvas
       var cw = imageCanvas.width, ch = imageCanvas.height; 
-      imageContext = imageCanvas.getContext("2d"); 
-      var bkgdImage = new Image(); 
+      imageContext = imageCanvas.getContext("2d");
       bkgdImage.crossOrigin = "Anonymous";
-      bkgdImage.src = "https://ncsucgclass.github.io/prog4/sky.jpg";
+      bkgdImage.src = background;
       bkgdImage.onload = function(){
           var iw = bkgdImage.width, ih = bkgdImage.height;
           imageContext.drawImage(bkgdImage,0,0,iw,ih,0,0,cw,ch);   
@@ -445,8 +459,11 @@ function loadModels() {
             console.log(e);
         } // end catch
     } // end make ellipsoid
-    
-    inputTriangles = getJSONFile(INPUT_TRIANGLES_URL,"triangles"); // read in the triangle data
+
+    if (!alternate)
+        inputTriangles = getJSONFile(INPUT_TRIANGLES_URL,"triangles"); // read in the triangle data
+    if (alternate)
+        inputTriangles = scoobyDooCharacters
 
     inputTriangles.sort((a, b) => b.material.alpha - a.material.alpha)
 
@@ -659,7 +676,6 @@ function setupShaders() {
             if (texColor.a <= 0.5) {
                 discard;
             }
-            
             vec4 finalColor;
             if (colorMultiplier >= .5) {
                 finalColor = texColor * vec4(colorOut, uAlpha);
