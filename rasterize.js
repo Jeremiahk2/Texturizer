@@ -24,6 +24,7 @@ var textureBuffers = [];
 var triSetSizes = []; // this contains the size of each triangle set
 var triangleBuffers = []; // lists of indices into vertexBuffers by set, in triples
 var viewDelta = 0; // how much to displace view with each key press
+var colorMultiplier = 1.0;
 
 /* shader parameter locations */
 var vPosAttribLoc; // where to put position for vertex shader
@@ -35,6 +36,8 @@ var specularULoc; // where to put specular reflecivity for fragment shader
 var shininessULoc; // where to put specular exponent for fragment shader
 var alphaLoc
 var texCoordLoc;
+var multiplierLoc;
+var sourceBlending;
 
 /* interaction variables */
 var Eye = vec3.clone(defaultEye); // eye position in world space
@@ -236,6 +239,17 @@ function handleKeyDown(event) {
                 vec3.set(inputEllipsoids[whichTriSet].yAxis,0,1,0);
             } // end for all ellipsoids
             break;
+        case "KeyB":
+            if (colorMultiplier >= .5 && (sourceBlending === undefined || sourceBlending === gl.SRC_ALPHA)) {
+                sourceBlending = gl.ONE_MINUS_DST_ALPHA;
+            }
+            else if (colorMultiplier >= .5 && sourceBlending === gl.ONE_MINUS_DST_ALPHA) {
+                sourceBlending = gl.SRC_ALPHA;
+                colorMultiplier = 0.0;
+            }
+            else {
+                colorMultiplier = 1.0;
+            }
     } // end switch
 } // end handleKeyDown
 
@@ -612,6 +626,7 @@ function setupShaders() {
         uniform vec3 uSpecular; // the specular reflectivity
         uniform float uShininess; // the specular exponent
         uniform float uAlpha; //The alpha (transparency) component.
+        uniform float colorMultiplier;
         
         // geometry properties
         varying vec3 vWorldPos; // world xyz of fragment
@@ -641,9 +656,16 @@ function setupShaders() {
             // combine to output color
             vec3 colorOut = ambient + diffuse + specular; // no specular yet
             vec4 texColor = texture2D(uSampler, v_texcoord);
-            vec4 finalColor = texColor * vec4(colorOut, uAlpha);
             if (texColor.a <= 0.5) {
                 discard;
+            }
+            
+            vec4 finalColor;
+            if (colorMultiplier >= .5) {
+                finalColor = texColor * vec4(colorOut, uAlpha);
+            }
+            else {
+                finalColor = texColor;
             }
             gl_FragColor = finalColor;
         }
@@ -701,6 +723,7 @@ function setupShaders() {
                 specularULoc = gl.getUniformLocation(shaderProgram, "uSpecular"); // ptr to specular
                 shininessULoc = gl.getUniformLocation(shaderProgram, "uShininess"); // ptr to shininess
                 alphaLoc = gl.getUniformLocation(shaderProgram, "uAlpha");
+                multiplierLoc = gl.getUniformLocation(shaderProgram, "colorMultiplier")
                 
                 // pass global constants into fragment uniforms
                 gl.uniform3fv(eyePositionULoc,Eye); // pass in the eye's position
@@ -773,7 +796,7 @@ function renderModels() {
     gl.depthMask(true);
     for (var whichTriSet=0; whichTriSet<numTriangleSets; whichTriSet++) {
         gl.enable(gl.BLEND);
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.blendFunc(sourceBlending || gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
         currSet = inputTriangles[whichTriSet];
         
@@ -789,6 +812,7 @@ function renderModels() {
         gl.uniform3fv(specularULoc,currSet.material.specular); // pass in the specular reflectivity
         gl.uniform1f(shininessULoc,currSet.material.n); // pass in the specular exponent
         gl.uniform1f(alphaLoc, currSet.material.alpha);
+        gl.uniform1f(multiplierLoc, colorMultiplier);
         
         // vertex buffer: activate and feed into vertex shader
         gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffers[whichTriSet]); // activate
