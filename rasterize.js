@@ -259,7 +259,7 @@ function setupWebGL() {
      
     // Get the canvas and context
     var canvas = document.getElementById("myWebGLCanvas"); // create a js canvas
-    gl = canvas.getContext("webgl"); // get a webgl object from it
+    gl = canvas.getContext("webgl", {premultipliedAlpha: true}); // get a webgl object from it
     
     try {
       if (gl == null) {
@@ -772,6 +772,9 @@ function renderModels() {
     var numTransparent = 0;
     gl.depthMask(true);
     for (var whichTriSet=0; whichTriSet<numTriangleSets; whichTriSet++) {
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
         currSet = inputTriangles[whichTriSet];
         
         // make model transform, add to view project
