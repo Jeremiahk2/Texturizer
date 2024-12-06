@@ -9,6 +9,10 @@ class CubeObject {
     }
     translation = vec3.fromValues(0.0, 0.0, 0.0);
 
+
+    backTopRight = vec4.fromValues(1.0, 0.0, -1.0, 1.0);
+    frontBottomLeft = vec4.fromValues(0.0, 1.0, 0.0, 1.0);
+
     scaling = vec3.fromValues(.1, .1, .1);
 
     vertices = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 0.0], //Front face
@@ -56,6 +60,8 @@ class AlienModel extends CubeObject {
 
 class SpaceshipModel extends CubeObject {
     texture = "https://jeremiahk2.github.io/textures.github.io/Red-1.jpg";
+
+    player = true;
 
     constructor() {
         super();

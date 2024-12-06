@@ -88,6 +88,9 @@ function handleKeyDown(event) {
         case "KeyD": // translate right, rotate right with shift
             input[1] = 1;
             break;
+        case "KeyW":
+            input[2] = 1;
+            break;
     } // end switch
 } // end handleKeyDown
 
@@ -101,6 +104,9 @@ function handleKeyUp(event) {
             break;
         case "KeyD": // translate right, rotate right with shift
             input[1] = 0;
+            break;
+        case "KeyW":
+            input[2] = 0;
             break;
     } // end switch
 }
@@ -483,17 +489,17 @@ function setupShaders() {
 
 // render the loaded model
 function renderModels() {
-    let lookAt = vec3.create(), viewRight = vec3.create(), temp = vec3.create(); // lookat, right & temp vectors
-    lookAt = vec3.normalize(lookAt,vec3.subtract(temp,Center,Eye)); // get lookat vector
-    viewRight = vec3.normalize(viewRight,vec3.cross(temp,lookAt,Up)); // get view right vector
-
     //Handle game loop input.
     if (input[0] === 1) {//Translate left if A is pressed down
-        translateModel(vec3.scale(temp,viewRight,-viewDelta));
+        translateModel(vec3.fromValues(-.02, 0, 0));
     }
     if (input[1] === 1) {//Translate right if D is pressed down
-        translateModel(vec3.scale(temp,viewRight,viewDelta));
+        translateModel(vec3.fromValues(.02, 0, 0));
     }
+    if (input[2] === 1) {
+        translateModel(vec3.fromValues(0, .02, 0));
+    }
+    //Handle collision
 
     
     // construct the model transform matrix, based on model state
@@ -523,9 +529,46 @@ function renderModels() {
         
     } // end make model transform
 
+    function checkCollisions(currModel, index) {
+        if (currModel.player) {
+            return;
+        }
+        let currSetBackTopRight = vec4.create();
+        let currSetFrontBotLeft = vec4.create();
+        vec4.transformMat4(currSetBackTopRight, currModel.backTopRight, mMatrix);
+        vec4.transformMat4(currSetFrontBotLeft, currModel.frontBottomLeft, mMatrix);
+        let curMinX = currSetFrontBotLeft[0];
+        let curMaxX = currSetBackTopRight[0];
+        let curMinY = currSetBackTopRight[1];
+        let curMaxY = currSetFrontBotLeft[1];
+        let curMinZ = currSetBackTopRight[2];
+        let curMaxZ = currSetFrontBotLeft[2];
+
+        let playerBackTopRight = vec4.create();
+        let playerFrontBotLeft = vec4.create();
+        vec4.transformMat4(playerBackTopRight, player.backTopRight, playerMatrix);
+        vec4.transformMat4(playerFrontBotLeft, player.frontBottomLeft, playerMatrix);
+        let playMinX = playerFrontBotLeft[0];
+        let playMaxX = playerBackTopRight[0];
+        let playMinY = playerBackTopRight[1];
+        let playMaxY = playerFrontBotLeft[1];
+        let playMinZ = playerBackTopRight[2];
+        let playMaxZ = playerFrontBotLeft[2];
+        if (playMinX <= curMaxX && playMaxX >= curMinX) {
+            if (playMinY <= curMaxY && playMaxY >= curMinY) {
+                if (playMinZ <= curMaxZ && playMaxZ >= curMinZ) {
+                    console.log("Collision Detected");
+                }
+            }
+        }
+
+
+    }
+
     let pMatrix = mat4.create(); // projection matrix
     let vMatrix = mat4.create(); // view matrix
     let mMatrix = mat4.create(); // model matrix
+    let playerMatrix = mat4.create();
     let pvMatrix = mat4.create(); // hand * proj * view matrices
     let pvmMatrix = mat4.create(); // hand * proj * view * model matrices
     
@@ -545,6 +588,11 @@ function renderModels() {
     let currSet; // the tri set and its material properties
     let numTransparent = 0;
     gl.depthMask(true);
+
+    makeModelTransform(player);
+    mat4.multiply(playerMatrix, playerMatrix, mMatrix);
+
+
     for (let whichTriSet=0; whichTriSet<numTriangleSets; whichTriSet++) {
         gl.enable(gl.BLEND);
         gl.blendFunc(sourceBlending || gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -554,6 +602,8 @@ function renderModels() {
         // make model transform, add to view project
         makeModelTransform(currSet);
         mat4.multiply(pvmMatrix,pvMatrix,mMatrix); // project * view * model
+        checkCollisions(currSet, whichTriSet);
+
         gl.uniformMatrix4fv(mMatrixULoc, false, mMatrix); // pass in the m matrix
         gl.uniformMatrix4fv(pvmMatrixULoc, false, pvmMatrix); // pass in the hpvm matrix
         
@@ -588,6 +638,8 @@ function renderModels() {
         gl.drawElements(gl.TRIANGLES,3*triSetSizes[whichTriSet],gl.UNSIGNED_SHORT,0); // render
         
     } // end for each triangle set
+
+
 } // end render model
 
 /* MAIN -- HERE is where execution begins after window load */
