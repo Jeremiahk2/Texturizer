@@ -20,6 +20,8 @@ const SPACESHIP_START = vec3.fromValues(-.5, -.9, 0.0);
 
 let player = new SpaceshipModel();
 
+let input  = [0,0,0] //Left, Right, Fire (A, D, Fire)
+
 let background = "https://ncsucgclass.github.io/prog4/stars.jpg";
 
 /* webgl and geometry data */
@@ -54,60 +56,62 @@ let Up = vec3.clone(defaultUp); // view up vector in world space
 //Texture buffers
 let textures = [];
 
+function translateModel(offset) {
+    vec3.add(player.translation,player.translation,offset);
+} // end translate model
+
+// function rotateModel(axis,direction) {
+//     if (handleKeyDown.modelOn != null) {
+//         let newRotation = mat4.create();
+//
+//         mat4.fromRotation(newRotation,direction*rotateTheta,axis); // get a rotation matrix around passed axis
+//         vec3.transformMat4(handleKeyDown.modelOn.xAxis,handleKeyDown.modelOn.xAxis,newRotation); // rotate model x axis tip
+//         vec3.transformMat4(handleKeyDown.modelOn.yAxis,handleKeyDown.modelOn.yAxis,newRotation); // rotate model y axis tip
+//     } // end if there is a highlighted model
+// } // end rotate model
+// function highlightModel(modelType,whichModel) {
+//     if (handleKeyDown.modelOn != null)
+//         handleKeyDown.modelOn.on = false;
+//     handleKeyDown.whichOn = whichModel;
+//     handleKeyDown.modelOn = gameObjects[whichModel];
+//     handleKeyDown.modelOn.on = true;
+// } // end highlight model
+
 // does stuff when keys are pressed
 function handleKeyDown(event) {
-    const dirEnum = {NEGATIVE: -1, POSITIVE: 1}; // enumerated rotation direction
-    
-    function translateModel(offset) {
-        vec3.add(player.translation,player.translation,offset);
-    } // end translate model
-
-    function rotateModel(axis,direction) {
-        if (handleKeyDown.modelOn != null) {
-            let newRotation = mat4.create();
-
-            mat4.fromRotation(newRotation,direction*rotateTheta,axis); // get a rotation matrix around passed axis
-            vec3.transformMat4(handleKeyDown.modelOn.xAxis,handleKeyDown.modelOn.xAxis,newRotation); // rotate model x axis tip
-            vec3.transformMat4(handleKeyDown.modelOn.yAxis,handleKeyDown.modelOn.yAxis,newRotation); // rotate model y axis tip
-        } // end if there is a highlighted model
-    } // end rotate model
-    function highlightModel(modelType,whichModel) {
-        if (handleKeyDown.modelOn != null)
-            handleKeyDown.modelOn.on = false;
-        handleKeyDown.whichOn = whichModel;
-        handleKeyDown.modelOn = gameObjects[whichModel];
-        handleKeyDown.modelOn.on = true;
-    } // end highlight model
-    
-    // set up needed view params
-    let lookAt = vec3.create(), viewRight = vec3.create(), temp = vec3.create(); // lookat, right & temp vectors
-    lookAt = vec3.normalize(lookAt,vec3.subtract(temp,Center,Eye)); // get lookat vector
-    viewRight = vec3.normalize(viewRight,vec3.cross(temp,lookAt,Up)); // get view right vector
-    
-    // highlight static variables
-    handleKeyDown.whichOn = handleKeyDown.whichOn == undefined ? -1 : handleKeyDown.whichOn; // nothing selected initially
-    handleKeyDown.modelOn = handleKeyDown.modelOn == undefined ? null : handleKeyDown.modelOn; // nothing selected initially
-
     switch (event.code) {
             
         // model transformation
         case "KeyA": // translate left, rotate left with shift
-            console.log("Here");
-            translateModel(vec3.scale(temp,viewRight,viewDelta));
+            input[0] = 1;
             break;
         case "KeyD": // translate right, rotate right with shift
-            translateModel(vec3.scale(temp,viewRight,-viewDelta));
+            input[1] = 1;
             break;
     } // end switch
 } // end handleKeyDown
 
 
+function handleKeyUp(event) {
+    switch (event.code) {
+
+        // model transformation
+        case "KeyA": // translate left, rotate left with shift
+            input[0] = 0;
+            break;
+        case "KeyD": // translate right, rotate right with shift
+            input[1] = 0;
+            break;
+    } // end switch
+}
+
+
 let bkgdImage = new Image();
 // set up the webGL environment
 function setupWebGL() {
-    
-    // Set up keys
-    document.onkeydown = handleKeyDown; // call this when key pressed
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
 
     let imageCanvas = document.getElementById("myImageCanvas"); // create a 2d canvas
     let cw = imageCanvas.width, ch = imageCanvas.height;
@@ -479,6 +483,18 @@ function setupShaders() {
 
 // render the loaded model
 function renderModels() {
+    let lookAt = vec3.create(), viewRight = vec3.create(), temp = vec3.create(); // lookat, right & temp vectors
+    lookAt = vec3.normalize(lookAt,vec3.subtract(temp,Center,Eye)); // get lookat vector
+    viewRight = vec3.normalize(viewRight,vec3.cross(temp,lookAt,Up)); // get view right vector
+
+    //Handle game loop input.
+    if (input[0] === 1) {//Translate left if A is pressed down
+        translateModel(vec3.scale(temp,viewRight,-viewDelta));
+    }
+    if (input[1] === 1) {//Translate right if D is pressed down
+        translateModel(vec3.scale(temp,viewRight,viewDelta));
+    }
+
     
     // construct the model transform matrix, based on model state
     function makeModelTransform(currModel) {

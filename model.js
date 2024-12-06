@@ -61,3 +61,7 @@ class SpaceshipModel extends CubeObject {
         super();
     }
 }
+
+
+//Ideas for make it your own:
+//Have the character get attacked from two planes. Ones above and then ones into the Z axis.
