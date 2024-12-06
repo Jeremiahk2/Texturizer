@@ -1,9 +1,8 @@
 /* GLOBAL CONSTANTS AND VARIABLES */
 
 /* assignment specific globals */
-const INPUT_TRIANGLES_URL = "https://ncsucgclass.github.io/prog4/triangles.json"; // triangles file loc
-let defaultEye = vec3.fromValues(0.5,0.5,-0.5); // default eye position in world space
-let defaultCenter = vec3.fromValues(0.5,0.5,0.5); // default view direction in world space
+let defaultEye = vec3.fromValues(0.0,0.0,0.5); // default eye position in world space
+let defaultCenter = vec3.fromValues(0.0,0.0,0.0); // default view direction in world space
 let defaultUp = vec3.fromValues(0,1,0); // default view up vector
 let lightAmbient = vec3.fromValues(1,1,1); // default light ambient emission
 let lightDiffuse = vec3.fromValues(1,1,1); // default light diffuse emission
@@ -11,19 +10,27 @@ let lightSpecular = vec3.fromValues(1,1,1); // default light specular emission
 let lightPosition = vec3.fromValues(-0.5,1.5,-0.5); // default light position
 let rotateTheta = Math.PI/50; // how much to rotate models by with each key press
 
+const ALIEN_ROWS = 2;
+const ALIENS_PER_ROW = 6;
+const ALIEN_SPACING = .2;
+const ALIEN_START_X = -1.0;
+const ALIEN_START_Y = -.0
+
+const SPACESHIP_START = vec3.fromValues(-.5, -.9, 0.0);
+
+let player = new SpaceshipModel();
+
 let background = "https://ncsucgclass.github.io/prog4/stars.jpg";
-let alternate = false;
 
 /* webgl and geometry data */
 let gl = null; // the all powerful gl object. It's all here folks!
-let inputTriangles = []; // the triangle data as loaded from input files
 let numTriangleSets = 0; // how many triangle sets in input scene
 let vertexBuffers = []; // this contains vertex coordinate lists by set, in triples
 let normalBuffers = []; // this contains normal component lists by set, in triples
 let textureBuffers = [];
 let triSetSizes = []; // this contains the size of each triangle set
 let triangleBuffers = []; // lists of indices into vertexBuffers by set, in triples
-let viewDelta = 0; // how much to displace view with each key press
+let viewDelta = .02; // how much to displace view with each key press
 let colorMultiplier = 1.0;
 
 /* shader parameter locations */
@@ -47,42 +54,12 @@ let Up = vec3.clone(defaultUp); // view up vector in world space
 //Texture buffers
 let textures = [];
 
-// ASSIGNMENT HELPER FUNCTIONS
-
-// get the JSON file from the passed URL
-function getJSONFile(url,descr) {
-    try {
-        if ((typeof(url) !== "string") || (typeof(descr) !== "string"))
-            throw "getJSONFile: parameter not a string";
-        else {
-            let httpReq = new XMLHttpRequest(); // a new http request
-            httpReq.open("GET",url,false); // init the request
-            httpReq.send(null); // send the request
-            let startTime = Date.now();
-            while ((httpReq.status !== 200) && (httpReq.readyState !== XMLHttpRequest.DONE)) {
-                if ((Date.now()-startTime) > 3000)
-                    break;
-            } // until its loaded or we time out after three seconds
-            if ((httpReq.status !== 200) || (httpReq.readyState !== XMLHttpRequest.DONE))
-                throw "Unable to open "+descr+" file!";
-            else
-                return JSON.parse(httpReq.response); 
-        } // end if good params
-    } // end try    
-    
-    catch(e) {
-        console.log(e);
-        return(String.null);
-    }
-} // end get input json file
-
 // does stuff when keys are pressed
 function handleKeyDown(event) {
     const dirEnum = {NEGATIVE: -1, POSITIVE: 1}; // enumerated rotation direction
     
     function translateModel(offset) {
-        if (handleKeyDown.modelOn != null)
-            vec3.add(handleKeyDown.modelOn.translation,handleKeyDown.modelOn.translation,offset);
+        vec3.add(player.translation,player.translation,offset);
     } // end translate model
 
     function rotateModel(axis,direction) {
@@ -94,6 +71,13 @@ function handleKeyDown(event) {
             vec3.transformMat4(handleKeyDown.modelOn.yAxis,handleKeyDown.modelOn.yAxis,newRotation); // rotate model y axis tip
         } // end if there is a highlighted model
     } // end rotate model
+    function highlightModel(modelType,whichModel) {
+        if (handleKeyDown.modelOn != null)
+            handleKeyDown.modelOn.on = false;
+        handleKeyDown.whichOn = whichModel;
+        handleKeyDown.modelOn = gameObjects[whichModel];
+        handleKeyDown.modelOn.on = true;
+    } // end highlight model
     
     // set up needed view params
     let lookAt = vec3.create(), viewRight = vec3.create(), temp = vec3.create(); // lookat, right & temp vectors
@@ -108,16 +92,11 @@ function handleKeyDown(event) {
             
         // model transformation
         case "KeyA": // translate left, rotate left with shift
-            if (event.getModifierState("Shift"))
-                rotateModel(Up,dirEnum.NEGATIVE);
-            else
-                translateModel(vec3.scale(temp,viewRight,viewDelta));
+            console.log("Here");
+            translateModel(vec3.scale(temp,viewRight,viewDelta));
             break;
         case "KeyD": // translate right, rotate right with shift
-            if (event.getModifierState("Shift"))
-                rotateModel(Up,dirEnum.POSITIVE);
-            else
-                translateModel(vec3.scale(temp,viewRight,-viewDelta));
+            translateModel(vec3.scale(temp,viewRight,-viewDelta));
             break;
     } // end switch
 } // end handleKeyDown
@@ -232,18 +211,33 @@ function isPowerOf2(value) {
     return (value & (value - 1)) === 0;
 }
 
+let gameObjects = [];
+
+function  createObjects() {
+    gameObjects = [];
+
+    let currentY = ALIEN_START_Y;
+    for (let i = 0; i < ALIEN_ROWS; i++) {
+        let currentX = ALIEN_START_X;
+        for (let j = 0; j < ALIENS_PER_ROW; j++) {
+            let alien = new AlienModel();
+            alien.translation = vec3.fromValues(currentX, currentY, 0.0);
+            gameObjects.push(alien);
+            currentX += ALIEN_SPACING;
+        }
+        currentY -= ALIEN_SPACING;
+    }
+    player.translation = SPACESHIP_START;
+    gameObjects.push(player);
+}
+
 // read models in, load them into webgl buffers
 function loadModels() {
 
-    if (!alternate)
-        inputTriangles = getJSONFile(INPUT_TRIANGLES_URL,"triangles"); // read in the triangle data
-    if (alternate)
-        inputTriangles = scoobyDooCharacters
-
-    inputTriangles.sort((a, b) => b.material.alpha - a.material.alpha)
+    // aliens.sort((a, b) => b.material.alpha - a.material.alpha)
 
     try {
-        if (inputTriangles == String.null)
+        if (gameObjects == String.null)
             throw "Unable to load triangles file!";
         else {
             let whichSetVert; // index of vertex in current triangle set
@@ -256,57 +250,57 @@ function loadModels() {
             let minCorner = vec3.fromValues(Number.MAX_VALUE,Number.MAX_VALUE,Number.MAX_VALUE); // other corner
         
             // process each triangle set to load webgl vertex and triangle buffers
-            numTriangleSets = inputTriangles.length; // remember how many tri sets
+            numTriangleSets = gameObjects.length; // remember how many tri sets
             for (let whichSet=0; whichSet<numTriangleSets; whichSet++) { // for each tri set
                 
                 // set up hilighting, modeling translation and rotation
-                inputTriangles[whichSet].center = vec3.fromValues(0,0,0);  // center point of tri set
-                inputTriangles[whichSet].on = false; // not highlighted
-                inputTriangles[whichSet].translation = vec3.fromValues(0,0,0); // no translation
-                inputTriangles[whichSet].xAxis = vec3.fromValues(1,0,0); // model X axis
-                inputTriangles[whichSet].yAxis = vec3.fromValues(0,1,0); // model Y axis 
+                gameObjects[whichSet].center = vec3.fromValues(0,0,0);  // center point of tri set
+                gameObjects[whichSet].on = false; // not highlighted
+                // gameObjects[whichSet].translation = vec3.fromValues(0,0,0); // no translation
+                gameObjects[whichSet].xAxis = vec3.fromValues(1,0,0); // model X axis
+                gameObjects[whichSet].yAxis = vec3.fromValues(0,1,0); // model Y axis
 
                 // set up the vertex and normal arrays, define model center and axes
-                inputTriangles[whichSet].glVertices = []; // flat coord list for webgl
-                inputTriangles[whichSet].glNormals = []; // flat normal list for webgl
-                inputTriangles[whichSet].glTextures = [];
-                let numVerts = inputTriangles[whichSet].vertices.length; // num vertices in tri set
+                gameObjects[whichSet].glVertices = []; // flat coord list for webgl
+                gameObjects[whichSet].glNormals = []; // flat normal list for webgl
+                gameObjects[whichSet].glTextures = [];
+                let numVerts = gameObjects[whichSet].vertices.length; // num vertices in tri set
                 for (whichSetVert=0; whichSetVert<numVerts; whichSetVert++) { // verts in set
-                    vtxToAdd = inputTriangles[whichSet].vertices[whichSetVert]; // get vertex to add
-                    normToAdd = inputTriangles[whichSet].normals[whichSetVert]; // get normal to add
-                    textureToAdd = inputTriangles[whichSet].uvs[whichSetVert]; //Get uvs to add
-                    inputTriangles[whichSet].glVertices.push(vtxToAdd[0],vtxToAdd[1],vtxToAdd[2]); // put coords in set coord list
-                    inputTriangles[whichSet].glNormals.push(normToAdd[0],normToAdd[1],normToAdd[2]); // put normal in set coord list
-                    inputTriangles[whichSet].glTextures.push(textureToAdd[0], textureToAdd[1]); //Put uvs in set coord list
+                    vtxToAdd = gameObjects[whichSet].vertices[whichSetVert]; // get vertex to add
+                    normToAdd = gameObjects[whichSet].normals[whichSetVert]; // get normal to add
+                    textureToAdd = gameObjects[whichSet].uvs[whichSetVert]; //Get uvs to add
+                    gameObjects[whichSet].glVertices.push(vtxToAdd[0],vtxToAdd[1],vtxToAdd[2]); // put coords in set coord list
+                    gameObjects[whichSet].glNormals.push(normToAdd[0],normToAdd[1],normToAdd[2]); // put normal in set coord list
+                    gameObjects[whichSet].glTextures.push(textureToAdd[0], textureToAdd[1]); //Put uvs in set coord list
                     vec3.max(maxCorner,maxCorner,vtxToAdd); // update world bounding box corner maxima
                     vec3.min(minCorner,minCorner,vtxToAdd); // update world bounding box corner minima
-                    vec3.add(inputTriangles[whichSet].center,inputTriangles[whichSet].center,vtxToAdd); // add to ctr sum
+                    vec3.add(gameObjects[whichSet].center,gameObjects[whichSet].center,vtxToAdd); // add to ctr sum
                 } // end for vertices in set
-                vec3.scale(inputTriangles[whichSet].center,inputTriangles[whichSet].center,1/numVerts); // avg ctr sum
+                vec3.scale(gameObjects[whichSet].center,gameObjects[whichSet].center,1/numVerts); // avg ctr sum
 
                 // send the vertex coords and normals to webGL
                 vertexBuffers[whichSet] = gl.createBuffer(); // init empty webgl set vertex coord buffer
                 gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffers[whichSet]); // activate that buffer
-                gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(inputTriangles[whichSet].glVertices),gl.STATIC_DRAW); // data in
+                gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(gameObjects[whichSet].glVertices),gl.STATIC_DRAW); // data in
                 normalBuffers[whichSet] = gl.createBuffer(); // init empty webgl set normal component buffer
                 gl.bindBuffer(gl.ARRAY_BUFFER,normalBuffers[whichSet]); // activate that buffer
-                gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(inputTriangles[whichSet].glNormals),gl.STATIC_DRAW); // data in
+                gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(gameObjects[whichSet].glNormals),gl.STATIC_DRAW); // data in
                 textureBuffers[whichSet] = gl.createBuffer();
                 gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffers[whichSet]);
-                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(inputTriangles[whichSet].glTextures),gl.STATIC_DRAW); //pin
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(gameObjects[whichSet].glTextures),gl.STATIC_DRAW); //pin
             
                 // set up the triangle index array, adjusting indices across sets
-                inputTriangles[whichSet].glTriangles = []; // flat index list for webgl
-                triSetSizes[whichSet] = inputTriangles[whichSet].triangles.length; // number of tris in this set
+                gameObjects[whichSet].glTriangles = []; // flat index list for webgl
+                triSetSizes[whichSet] = gameObjects[whichSet].triangles.length; // number of tris in this set
                 for (whichSetTri=0; whichSetTri<triSetSizes[whichSet]; whichSetTri++) {
-                    triToAdd = inputTriangles[whichSet].triangles[whichSetTri]; // get tri to add
-                    inputTriangles[whichSet].glTriangles.push(triToAdd[0],triToAdd[1],triToAdd[2]); // put indices in set list
+                    triToAdd = gameObjects[whichSet].triangles[whichSetTri]; // get tri to add
+                    gameObjects[whichSet].glTriangles.push(triToAdd[0],triToAdd[1],triToAdd[2]); // put indices in set list
                 } // end for triangles in set
 
                 // send the triangle indices to webGL
                 triangleBuffers.push(gl.createBuffer()); // init empty triangle index buffer
                 gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, triangleBuffers[whichSet]); // activate that buffer
-                gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(inputTriangles[whichSet].glTriangles),gl.STATIC_DRAW); // data in
+                gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(gameObjects[whichSet].glTriangles),gl.STATIC_DRAW); // data in
 
             } // end for each triangle set
         } // end if triangle file loaded
@@ -494,8 +488,7 @@ function renderModels() {
         mat4.fromTranslation(mMatrix,vec3.negate(negCtr,currModel.center)); 
         
         // scale for highlighting if needed
-        if (currModel.on)
-            mat4.multiply(mMatrix,mat4.fromScaling(temp,vec3.fromValues(1.2,1.2,1.2)),mMatrix); // S(1.2) * T(-ctr)
+        mat4.multiply(mMatrix,mat4.fromScaling(temp,currModel.scaling),mMatrix); // S(1.2) * T(-ctr)
         
         // rotate the model to current interactive orientation
         vec3.normalize(zAxis,vec3.cross(zAxis,currModel.xAxis,currModel.yAxis)); // get the new model z axis
@@ -540,7 +533,7 @@ function renderModels() {
         gl.enable(gl.BLEND);
         gl.blendFunc(sourceBlending || gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-        currSet = inputTriangles[whichTriSet];
+        currSet = gameObjects[whichTriSet];
         
         // make model transform, add to view project
         makeModelTransform(currSet);
@@ -585,10 +578,11 @@ function renderModels() {
 function main() {
 
     setupWebGL(); // set up the webGL environment
+    createObjects();
     loadModels(); // load in the models from tri file
     setupShaders(); // setup the webGL shaders
     for (let i = 0; i < numTriangleSets; i++) {
-        textures[i] = loadTexture(gl, "https://ncsucgclass.github.io/prog4/" + inputTriangles[i].material.texture);
+        textures[i] = loadTexture(gl, gameObjects[i].texture);
     }
     renderModels(); // draw the triangles using webGL
   
