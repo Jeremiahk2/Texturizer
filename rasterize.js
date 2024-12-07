@@ -238,8 +238,8 @@ function  createObjects() {
     for (let i = 0; i < ALIEN_ROWS; i++) {
         let currentX = ALIEN_START_X;
         for (let j = 0; j < ALIENS_PER_ROW; j++) {
-            let alien = new AlienModel();
-            alien.translation = vec3.fromValues(currentX, currentY, 0.0);
+            let translation = vec3.fromValues(currentX, currentY, 0.0);
+            let alien = new AlienModel(translation);
             gameObjects.push(alien);
             currentX += ALIEN_SPACING;
         }
@@ -498,36 +498,40 @@ function setupShaders() {
     } // end catch
 } // end setup shaders
 
+let lastFrameTime = performance.now();
+
+
 // render the loaded model
-function renderModels() {
+function renderModels(time) {
+
+    let elapsed = time - lastFrameTime; //Elapsed time in milliseconds
+    elapsed /= 1000; //Elapsed time in seconds.
+    lastFrameTime = time;
+
     //Handle game loop input.
     if (input[0] === 1) {//Translate left if A is pressed down
-        translatePlayer(vec3.fromValues(-.02, 0, 0));
+        translatePlayer(vec3.fromValues(elapsed * -1.5, 0, 0));
     }
     if (input[1] === 1) {//Translate right if D is pressed down
-        translatePlayer(vec3.fromValues(.02, 0, 0));
+        translatePlayer(vec3.fromValues(elapsed * 1.5, 0, 0));
     }
     if (input[2] === 1) {
         if (playerBullet.fired === false) {
             playerBullet.fired = true;
         }
     }
-    //Handle physics
-    if (playerBullet.fired === true) {
-        translateObject(vec3.fromValues(0, .02, 0), playerBullet);
-    }
 
-    
+
     // construct the model transform matrix, based on model state
     function makeModelTransform(currModel) {
         let zAxis = vec3.create(), sumRotation = mat4.create(), temp = mat4.create(), negCtr = vec3.create();
 
         // move the model to the origin
-        mat4.fromTranslation(mMatrix,vec3.negate(negCtr,currModel.center)); 
-        
+        mat4.fromTranslation(mMatrix,vec3.negate(negCtr,currModel.center));
+
         // scale for highlighting if needed
         mat4.multiply(mMatrix,mat4.fromScaling(temp,currModel.scaling),mMatrix); // S(1.2) * T(-ctr)
-        
+
         // rotate the model to current interactive orientation
         vec3.normalize(zAxis,vec3.cross(zAxis,currModel.xAxis,currModel.yAxis)); // get the new model z axis
         mat4.set(sumRotation, // get the composite rotation
@@ -536,13 +540,13 @@ function renderModels() {
             currModel.xAxis[2], currModel.yAxis[2], zAxis[2], 0,
             0, 0,  0, 1);
         mat4.multiply(mMatrix,sumRotation,mMatrix); // R(ax) * S(1.2) * T(-ctr)
-        
+
         // translate back to model center
         mat4.multiply(mMatrix,mat4.fromTranslation(temp,currModel.center),mMatrix); // T(ctr) * R(ax) * S(1.2) * T(-ctr)
 
         // translate model to current interactive orientation
         mat4.multiply(mMatrix,mat4.fromTranslation(temp,currModel.translation),mMatrix); // T(pos)*T(ctr)*R(ax)*S(1.2)*T(-ctr)
-        
+
     } // end make model transform
 
     function checkCollisions(currModel, index) {
@@ -619,12 +623,12 @@ function renderModels() {
     let bulletMatrix = mat4.create();
     let pvMatrix = mat4.create(); // hand * proj * view matrices
     let pvmMatrix = mat4.create(); // hand * proj * view * model matrices
-    
+
     window.requestAnimationFrame(renderModels); // set up frame render callback
-    
+
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // clear frame/depth buffers
 
-    
+
     // set up projection and view
     // mat4.fromScaling(hMatrix,vec3.fromValues(-1,1,1)); // create handedness matrix
     mat4.perspective(pMatrix,0.5*Math.PI,1,0.1,10); // create projection matrix
@@ -657,7 +661,7 @@ function renderModels() {
 
         gl.uniformMatrix4fv(mMatrixULoc, false, mMatrix); // pass in the m matrix
         gl.uniformMatrix4fv(pvmMatrixULoc, false, pvmMatrix); // pass in the hpvm matrix
-        
+
         // reflectivity: feed to the fragment shader
         gl.uniform3fv(ambientULoc,currSet.material.ambient); // pass in the ambient reflectivity
         gl.uniform3fv(diffuseULoc,currSet.material.diffuse); // pass in the diffuse reflectivity
@@ -665,7 +669,7 @@ function renderModels() {
         gl.uniform1f(shininessULoc,currSet.material.n); // pass in the specular exponent
         gl.uniform1f(alphaLoc, currSet.material.alpha);
         gl.uniform1f(multiplierLoc, colorMultiplier);
-        
+
         // vertex buffer: activate and feed into vertex shader
         gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffers[whichTriSet]); // activate
         gl.vertexAttribPointer(vPosAttribLoc,3,gl.FLOAT,false,0,0); // feed
@@ -687,13 +691,41 @@ function renderModels() {
         // triangle buffer: activate and render
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,triangleBuffers[whichTriSet]); // activate
         gl.drawElements(gl.TRIANGLES,3*triSetSizes[whichTriSet],gl.UNSIGNED_SHORT,0); // render
-        
+
     } // end for each triangle set
 
-
+    //Check and handle collisions
     for (let i = gameObjects.length - 1; i >= 0; i--) {
         checkCollisions(gameObjects[i], i);
     }
+
+    //Handle physics
+
+    //Handle bullet physics
+    if (playerBullet.fired === true) {
+
+        let temp = vec4.create();
+        vec4.transformMat4(temp, playerBullet.frontBottomLeft, playerBullet.mMatrix);
+
+        //If out of bounds, reset bullet
+        if (temp[1] > 1.0) {
+            playerBullet.translation = vec3.clone(player.translation);
+            playerBullet.fired = false;
+        }
+        //Otherwise keep moving upwards.
+        else {
+            console.log("Bullet-Boundary Collision");
+            translateObject(vec3.fromValues(0, elapsed * 1.5, 0), playerBullet);
+        }
+    }
+
+    //Handle Alien movement
+    gameObjects.forEach(model => {
+        if (model.direction !== undefined) {
+            model.standardMovement(elapsed);
+        }
+    })
+
 
 
 } // end render model
