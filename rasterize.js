@@ -19,6 +19,7 @@ const ALIEN_START_Y = -.0
 const SPACESHIP_START = vec3.fromValues(-.5, -.9, 0.0);
 
 let player = new SpaceshipModel();
+let playerBullet = new BulletModel();
 
 let input  = [0,0,0] //Left, Right, Fire (A, D, Fire)
 
@@ -56,9 +57,16 @@ let Up = vec3.clone(defaultUp); // view up vector in world space
 //Texture buffers
 let textures = [];
 
-function translateModel(offset) {
+function translatePlayer(offset) {
     vec3.add(player.translation,player.translation,offset);
+    if (playerBullet.fired === false) {
+        vec3.add(playerBullet.translation,playerBullet.translation,offset);
+    }
 } // end translate model
+
+function translateObject(offset, object) {
+    vec3.add(object.translation,object.translation,offset);
+}
 
 // function rotateModel(axis,direction) {
 //     if (handleKeyDown.modelOn != null) {
@@ -88,7 +96,7 @@ function handleKeyDown(event) {
         case "KeyD": // translate right, rotate right with shift
             input[1] = 1;
             break;
-        case "KeyW":
+        case "Space":
             input[2] = 1;
             break;
     } // end switch
@@ -105,7 +113,7 @@ function handleKeyUp(event) {
         case "KeyD": // translate right, rotate right with shift
             input[1] = 0;
             break;
-        case "KeyW":
+        case "Space":
             input[2] = 0;
             break;
     } // end switch
@@ -239,6 +247,9 @@ function  createObjects() {
     }
     player.translation = SPACESHIP_START;
     gameObjects.push(player);
+
+    playerBullet.translation = vec3.fromValues(-.5, -.9, 0.0);
+    gameObjects.push(playerBullet);
 }
 
 // read models in, load them into webgl buffers
@@ -261,7 +272,7 @@ function loadModels() {
         
             // process each triangle set to load webgl vertex and triangle buffers
             numTriangleSets = gameObjects.length; // remember how many tri sets
-            for (let whichSet=0; whichSet<numTriangleSets; whichSet++) { // for each tri set
+            for (let whichSet=0; whichSet<gameObjects.length; whichSet++) { // for each tri set
                 
                 // set up hilighting, modeling translation and rotation
                 gameObjects[whichSet].center = vec3.fromValues(0,0,0);  // center point of tri set
@@ -491,15 +502,20 @@ function setupShaders() {
 function renderModels() {
     //Handle game loop input.
     if (input[0] === 1) {//Translate left if A is pressed down
-        translateModel(vec3.fromValues(-.02, 0, 0));
+        translatePlayer(vec3.fromValues(-.02, 0, 0));
     }
     if (input[1] === 1) {//Translate right if D is pressed down
-        translateModel(vec3.fromValues(.02, 0, 0));
+        translatePlayer(vec3.fromValues(.02, 0, 0));
     }
     if (input[2] === 1) {
-        translateModel(vec3.fromValues(0, .02, 0));
+        if (playerBullet.fired === false) {
+            playerBullet.fired = true;
+        }
     }
-    //Handle collision
+    //Handle physics
+    if (playerBullet.fired === true) {
+        translateObject(vec3.fromValues(0, .02, 0), playerBullet);
+    }
 
     
     // construct the model transform matrix, based on model state
@@ -530,13 +546,14 @@ function renderModels() {
     } // end make model transform
 
     function checkCollisions(currModel, index) {
-        if (currModel.player) {
+        if (currModel.player || currModel.fired !== undefined) {
             return;
         }
+        //Get current model bounding boxes
         let currSetBackTopRight = vec4.create();
         let currSetFrontBotLeft = vec4.create();
-        vec4.transformMat4(currSetBackTopRight, currModel.backTopRight, mMatrix);
-        vec4.transformMat4(currSetFrontBotLeft, currModel.frontBottomLeft, mMatrix);
+        vec4.transformMat4(currSetBackTopRight, currModel.backTopRight, currModel.mMatrix);
+        vec4.transformMat4(currSetFrontBotLeft, currModel.frontBottomLeft, currModel.mMatrix);
         let curMinX = currSetFrontBotLeft[0];
         let curMaxX = currSetBackTopRight[0];
         let curMinY = currSetBackTopRight[1];
@@ -544,6 +561,7 @@ function renderModels() {
         let curMinZ = currSetBackTopRight[2];
         let curMaxZ = currSetFrontBotLeft[2];
 
+        //Get player model bounding boxes
         let playerBackTopRight = vec4.create();
         let playerFrontBotLeft = vec4.create();
         vec4.transformMat4(playerBackTopRight, player.backTopRight, playerMatrix);
@@ -554,13 +572,42 @@ function renderModels() {
         let playMaxY = playerFrontBotLeft[1];
         let playMinZ = playerBackTopRight[2];
         let playMaxZ = playerFrontBotLeft[2];
+
+        //Get bullet model bounding boxes
+        let bulletBackTopRight = vec4.create();
+        let bulletFrontBotLeft = vec4.create();
+        vec4.transformMat4(bulletBackTopRight, playerBullet.backTopRight, bulletMatrix);
+        vec4.transformMat4(bulletFrontBotLeft, playerBullet.frontBottomLeft, bulletMatrix);
+        let bullMinX = bulletFrontBotLeft[0];
+        let bullMaxX = bulletBackTopRight[0];
+        let bullMinY = bulletBackTopRight[1];
+        let bullMaxY = bulletFrontBotLeft[1];
+        let bullMinZ = bulletBackTopRight[2];
+        let bullMaxZ = bulletFrontBotLeft[2];
+
         if (playMinX <= curMaxX && playMaxX >= curMinX) {
             if (playMinY <= curMaxY && playMaxY >= curMinY) {
                 if (playMinZ <= curMaxZ && playMaxZ >= curMinZ) {
-                    console.log("Collision Detected");
+                    console.log("Player-Alien collision detected Detected");
                 }
             }
         }
+
+        if (bullMinX <= curMaxX && bullMaxX >= curMinX) {
+            if (bullMinY <= curMaxY && bullMaxY >= curMinY) {
+                if (bullMinZ <= curMaxZ && bullMaxZ >= curMinZ) {
+                    if (playerBullet.fired === true && currModel.material.alpha > 0.0) {
+                        playerBullet.translation = vec3.clone(player.translation);
+                        playerBullet.fired = false;
+                        gameObjects.splice(index, 1);
+                        textures.splice(index, 1);
+                        console.log("Bullet-Alien collision detected Detected");
+                    }
+                }
+            }
+        }
+
+
 
 
     }
@@ -569,6 +616,7 @@ function renderModels() {
     let vMatrix = mat4.create(); // view matrix
     let mMatrix = mat4.create(); // model matrix
     let playerMatrix = mat4.create();
+    let bulletMatrix = mat4.create();
     let pvMatrix = mat4.create(); // hand * proj * view matrices
     let pvmMatrix = mat4.create(); // hand * proj * view * model matrices
     
@@ -591,18 +639,21 @@ function renderModels() {
 
     makeModelTransform(player);
     mat4.multiply(playerMatrix, playerMatrix, mMatrix);
+    makeModelTransform(playerBullet);
+    mat4.multiply(bulletMatrix, bulletMatrix, mMatrix);
 
 
-    for (let whichTriSet=0; whichTriSet<numTriangleSets; whichTriSet++) {
+    for (let whichTriSet=0; whichTriSet<gameObjects.length; whichTriSet++) {
         gl.enable(gl.BLEND);
         gl.blendFunc(sourceBlending || gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
         currSet = gameObjects[whichTriSet];
-        
+
         // make model transform, add to view project
         makeModelTransform(currSet);
+        currSet.mMatrix = mat4.clone(mMatrix);
+
         mat4.multiply(pvmMatrix,pvMatrix,mMatrix); // project * view * model
-        checkCollisions(currSet, whichTriSet);
 
         gl.uniformMatrix4fv(mMatrixULoc, false, mMatrix); // pass in the m matrix
         gl.uniformMatrix4fv(pvmMatrixULoc, false, pvmMatrix); // pass in the hpvm matrix
@@ -640,6 +691,11 @@ function renderModels() {
     } // end for each triangle set
 
 
+    for (let i = gameObjects.length - 1; i >= 0; i--) {
+        checkCollisions(gameObjects[i], i);
+    }
+
+
 } // end render model
 
 /* MAIN -- HERE is where execution begins after window load */
@@ -649,7 +705,7 @@ function main() {
     createObjects();
     loadModels(); // load in the models from tri file
     setupShaders(); // setup the webGL shaders
-    for (let i = 0; i < numTriangleSets; i++) {
+    for (let i = 0; i < gameObjects.length; i++) {
         textures[i] = loadTexture(gl, gameObjects[i].texture);
     }
     renderModels(); // draw the triangles using webGL

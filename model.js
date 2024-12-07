@@ -68,6 +68,18 @@ class SpaceshipModel extends CubeObject {
     }
 }
 
+class BulletModel extends CubeObject {
+    texture = "https://jeremiahk2.github.io/textures.github.io/White-1.jpg"
+
+    scaling = vec3.fromValues(.01, .08, .01);
+
+    fired = false;
+
+    constructor() {
+        super();
+    }
+}
+
 
 //Ideas for make it your own:
 //Have the character get attacked from two planes. Ones above and then ones into the Z axis.
