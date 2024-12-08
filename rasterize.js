@@ -508,19 +508,6 @@ function renderModels(time) {
     elapsed /= 1000; //Elapsed time in seconds.
     lastFrameTime = time;
 
-    //Handle game loop input.
-    if (input[0] === 1) {//Translate left if A is pressed down
-        translatePlayer(vec3.fromValues(elapsed * -1.5, 0, 0));
-    }
-    if (input[1] === 1) {//Translate right if D is pressed down
-        translatePlayer(vec3.fromValues(elapsed * 1.5, 0, 0));
-    }
-    if (input[2] === 1) {
-        if (playerBullet.fired === false) {
-            playerBullet.fired = true;
-        }
-    }
-
 
     // construct the model transform matrix, based on model state
     function makeModelTransform(currModel) {
@@ -694,6 +681,29 @@ function renderModels(time) {
 
     } // end for each triangle set
 
+    //Handle game loop input.
+    let playerRightBound = vec4.create();
+    let playerLeftBound = vec4.create();
+    vec4.transformMat4(playerRightBound, player.backTopRight, playerMatrix);
+    vec4.transformMat4(playerLeftBound, player.frontBottomLeft, playerMatrix);
+
+    if (input[0] === 1) {//Translate left if A is pressed down
+        //Only if we are not at the edge of the screen.
+        if (playerLeftBound[0] > -0.9) {
+            translatePlayer(vec3.fromValues(elapsed * -1.5, 0, 0));
+        }
+    }
+    if (input[1] === 1) {//Translate right if D is pressed down
+        if (playerRightBound[0] < 0.9) {
+            translatePlayer(vec3.fromValues(elapsed * 1.5, 0, 0));
+        }
+    }
+    if (input[2] === 1) {
+        if (playerBullet.fired === false) {
+            playerBullet.fired = true;
+        }
+    }
+
     //Check and handle collisions
     for (let i = gameObjects.length - 1; i >= 0; i--) {
         checkCollisions(gameObjects[i], i);
@@ -709,12 +719,12 @@ function renderModels(time) {
 
         //If out of bounds, reset bullet
         if (temp[1] > 1.0) {
+            console.log("Bullet-Boundary Collision");
             playerBullet.translation = vec3.clone(player.translation);
             playerBullet.fired = false;
         }
         //Otherwise keep moving upwards.
         else {
-            console.log("Bullet-Boundary Collision");
             translateObject(vec3.fromValues(0, elapsed * 1.5, 0), playerBullet);
         }
     }

@@ -69,7 +69,6 @@ class AlienModel extends CubeObject {
     static setStandardMovement(elapsed) {
         if (!isNaN(elapsed)) {
             if (AlienModel.position < AlienModel.lowerLimit) {
-                console.log("Swapped");
                 //Change color
                 AlienModel.color = [0, 1, 0];
                 //Reverse direction, set new speed
