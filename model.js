@@ -51,33 +51,62 @@ class CubeObject {
 
 class AlienModel extends CubeObject {
 
-    static standardLimit = .4;
+    static position = 0.0;
+    static upperLimit = .4;
+    static lowerLimit = -.4;
+    static speed = new vec3.fromValues(-.5, 0, 0);
+    static color = [1, 1, 1];
 
-    direction = new vec3.fromValues(-.5, 0, 0);
-    translationLimitMin = vec3.create();
+    static reset = false;
+
     translationLimitMax = vec3.create();
+    translationLimitMin = vec3.create();
+
+    static standardMovement = vec3.create();
 
     texture = "https://jeremiahk2.github.io/textures.github.io/Blue-1.jpg";
 
-    standardMovement(elapsed) {
+    static setStandardMovement(elapsed) {
         if (!isNaN(elapsed)) {
-
-            if (this.translation[0] < this.translationLimitMin[0]) {
-                this.material.ambient = [0, 1, 0];
-                vec3.scale(this.direction, this.direction, -1);
+            if (AlienModel.position < AlienModel.lowerLimit) {
+                console.log("Swapped");
+                //Change color
+                AlienModel.color = [0, 1, 0];
+                //Reverse direction, set new speed
+                vec3.scale(AlienModel.speed, AlienModel.speed, -1);
+                vec3.scale(AlienModel.standardMovement, AlienModel.speed, elapsed);
+                //Reset values, signal all aliens to reset translations.
+                AlienModel.position = AlienModel.lowerLimit;
+                AlienModel.reset = true;
+            }
+            else if (AlienModel.position > AlienModel.upperLimit) {
+                AlienModel.color = [1, 1, 1];
+                vec3.scale(AlienModel.speed, AlienModel.speed, -1);
+                vec3.scale(AlienModel.standardMovement, AlienModel.speed, elapsed);
+                AlienModel.position = AlienModel.upperLimit
+                AlienModel.reset = true;
+            }
+            else {
+                AlienModel.reset = false;
+                vec3.scale(AlienModel.standardMovement, AlienModel.speed, elapsed);
+                AlienModel.position += AlienModel.standardMovement[0];
+            }
+        }
+    }
+    standardMovement() {
+        if (AlienModel.reset === true) {
+            this.material.ambient = AlienModel.color;
+            //If we've swapped to going in the +x direction, reset to min.
+            if (AlienModel.speed[0] > 0.0) {
                 vec3.copy(this.translation, this.translationLimitMin);
             }
-            else if (this.translation[0] > this.translationLimitMax[0]) {
-                this.material.ambient = [1, 1, 1];
-                vec3.scale(this.direction, this.direction, -1);
+            else {
+                //If we've swapped to going in the -x direction, reset to max.
                 vec3.copy(this.translation, this.translationLimitMax);
             }
-
-            let temp = vec3.create();
-            vec3.scale(temp, this.direction, elapsed);
-            vec3.add(this.translation, this.translation, temp);
-
-            this.distance += temp[0];
+        }
+        else {
+            vec3.add(this.translation, this.translation, AlienModel.standardMovement);
         }
 
     }
@@ -85,8 +114,8 @@ class AlienModel extends CubeObject {
     constructor(translation) {
         super();
         this.translation = translation;
-        vec3.subtract(this.translationLimitMin, this.translation, vec3.fromValues(AlienModel.standardLimit, 0, 0));
-        vec3.add(this.translationLimitMax, this.translation, vec3.fromValues(AlienModel.standardLimit, 0, 0));
+        vec3.add(this.translationLimitMin, this.translation, vec3.fromValues(AlienModel.lowerLimit, 0, 0));
+        vec3.add(this.translationLimitMax, this.translation, vec3.fromValues(AlienModel.upperLimit, 0, 0));
     }
 }
 

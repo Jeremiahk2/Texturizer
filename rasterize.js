@@ -720,9 +720,10 @@ function renderModels(time) {
     }
 
     //Handle Alien movement
+    AlienModel.setStandardMovement(elapsed);
     gameObjects.forEach(model => {
-        if (model.direction !== undefined) {
-            model.standardMovement(elapsed);
+        if (model.translationLimitMax !== undefined) {
+            model.standardMovement();
         }
     })
 
