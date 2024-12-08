@@ -51,20 +51,47 @@ class CubeObject {
 
 class AlienModel extends CubeObject {
 
+    //State information
+    state = 0; //0 = Standard, 1 = Descending, 2 = Returning
+
+    //Standard movement fields
     static position = 0.0;
     static upperLimit = .4;
     static lowerLimit = -.4;
     static speed = new vec3.fromValues(-.5, 0, 0);
     static color = [1, 1, 1];
-
     static reset = false;
+    static standardMovement = vec3.create();
 
+    //Descending movement fields.
+    amplitude = .3;
+    frequency = 2;
+    phase = Math.PI / 4;
+    descendingMovement = vec3.fromValues(0, -.25, 0);
+
+    //Alien-specific fields
     translationLimitMax = vec3.create();
     translationLimitMin = vec3.create();
 
-    static standardMovement = vec3.create();
-
     texture = "https://jeremiahk2.github.io/textures.github.io/Blue-1.jpg";
+
+    getSinusoidStep(height) {
+        const angularFrequency = 2 * Math.PI * this.frequency;
+        return this.amplitude * Math.sin(angularFrequency * height * this.phase);
+    }
+
+    handleDescendingMovement(elapsed) {
+        //Set color to match
+        this.material.ambient = AlienModel.color;
+        //Add descending (-y) movement.
+        let temp = vec3.create();
+        vec3.scale(temp, this.descendingMovement, elapsed);
+        vec3.add(this.translation, this.translation, temp);
+        //Add horizontal sinusoidal (+x) movement
+        const height = this.translationLimitMin[1] - this.translation[1];
+        vec3.scale(temp, vec3.fromValues(this.getSinusoidStep(height), 0, 0), elapsed);
+        vec3.add(this.translation, this.translation, temp);
+    }
 
     static setStandardMovement(elapsed) {
         if (!isNaN(elapsed)) {

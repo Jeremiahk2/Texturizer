@@ -499,7 +499,7 @@ function setupShaders() {
 } // end setup shaders
 
 let lastFrameTime = performance.now();
-
+let lastDropTime = performance.now();
 
 // render the loaded model
 function renderModels(time) {
@@ -729,11 +729,27 @@ function renderModels(time) {
         }
     }
 
-    //Handle Alien movement
+    //Descend an alien every second
+    if (time - lastDropTime >= 3000) {
+        let alienIndex = Math.random() * (gameObjects.length - 2)
+        alienIndex = Math.floor(alienIndex);
+        if (gameObjects[alienIndex].state === 0) {
+            gameObjects[alienIndex].state = 1;
+            gameObjects[alienIndex].amplitude = Math.random();
+        }
+        lastDropTime = time;
+    }
+
+    //Handle Alien Standard movement
     AlienModel.setStandardMovement(elapsed);
     gameObjects.forEach(model => {
         if (model.translationLimitMax !== undefined) {
-            model.standardMovement();
+            if (model.state === 0) {
+                model.standardMovement();
+            }
+            if (model.state === 1) {
+                model.handleDescendingMovement(elapsed);
+            }
         }
     })
 
