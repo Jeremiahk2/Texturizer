@@ -71,6 +71,7 @@ class AlienModel extends CubeObject {
 
     //Returning movement
     returningSeparation = 1;
+    currentSeparation = 1;
 
     //Alien-specific fields
     translationLimitMax = vec3.create();
@@ -152,11 +153,13 @@ class AlienModel extends CubeObject {
             this.material.ambient = AlienModel.color;
             //If we've swapped to going in the +x direction, reset to min.
             if (AlienModel.speed[0] > 0.0) {
-                vec3.copy(this.translation, this.translationLimitMin);
+                this.translation[0] = this.translationLimitMin[0];
+                // vec3.copy(this.translation, this.translationLimitMin);
             }
             else {
                 //If we've swapped to going in the -x direction, reset to max.
-                vec3.copy(this.translation, this.translationLimitMax);
+                this.translation[0] = this.translationLimitMax[0];
+                // vec3.copy(this.translation, this.translationLimitMax);
             }
         }
         else {
