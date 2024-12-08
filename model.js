@@ -69,6 +69,9 @@ class AlienModel extends CubeObject {
     phase = Math.PI / 4;
     descendingMovement = vec3.fromValues(0, -.25, 0);
 
+    //Returning movement
+    returningSeparation = 1;
+
     //Alien-specific fields
     translationLimitMax = vec3.create();
     translationLimitMin = vec3.create();
@@ -78,6 +81,19 @@ class AlienModel extends CubeObject {
     getSinusoidStep(height) {
         const angularFrequency = 2 * Math.PI * this.frequency;
         return this.amplitude * Math.sin(angularFrequency * height * this.phase);
+    }
+
+    handleReturningMovement(elapsed) {
+        this.standardMovement();
+        let timeStepVector = vec3.fromValues(0, elapsed * 1.75, 0);
+        vec3.subtract(this.translation, this.translation, timeStepVector);
+
+        if ( this.translation[1] <= this.translationLimitMin[1]) {
+            console.log(timeStepVector);
+            console.log("Returned");
+            this.state = 0;
+            this.translation[1] = this.translationLimitMin[1];
+        }
     }
 
     handleDescendingMovement(elapsed) {
@@ -91,6 +107,18 @@ class AlienModel extends CubeObject {
         const height = this.translationLimitMin[1] - this.translation[1];
         vec3.scale(temp, vec3.fromValues(this.getSinusoidStep(height), 0, 0), elapsed);
         vec3.add(this.translation, this.translation, temp);
+
+        if (this.translation[1] <= -2.0) {
+            this.state = 2; //Set to returning state when it hits the bottom boundary.
+            //Align with standard state
+            vec3.copy(this.translation, this.translationLimitMin);
+            vec3.add(this.translation, this.translation, vec3.fromValues(AlienModel.upperLimit, 0, 0));
+            vec3.add(this.translation, this.translation, vec3.fromValues(AlienModel.position, 0, 0));
+            const returningVector = vec3.fromValues(0, this.returningSeparation, 0);
+            vec3.add(this.translation, this.translation, returningVector);
+            // this.handleReturningMovement(elapsed);
+            console.log("Returning");
+        }
     }
 
     static setStandardMovement(elapsed) {

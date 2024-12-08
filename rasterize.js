@@ -747,8 +747,11 @@ function renderModels(time) {
             if (model.state === 0) {
                 model.standardMovement();
             }
-            if (model.state === 1) {
+            else if (model.state === 1) {
                 model.handleDescendingMovement(elapsed);
+            }
+            else if (model.state === 2) {
+                model.handleReturningMovement(elapsed)
             }
         }
     })
