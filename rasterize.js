@@ -232,6 +232,7 @@ function  createObjects() {
     vec3.copy(player.translation, SPACESHIP_START);
     gameObjects.push(player);
 
+    playerBullet.mainBullet = true;
     vec3.copy(playerBullet.translation, SPACESHIP_START);
     gameObjects.push(playerBullet);
     //Add alien bullets
@@ -528,7 +529,7 @@ function renderModels(time) {
 
     } // end make model transform
     function checkCollisions(currModel, index) {
-        if (currModel.player || currModel.fired !== undefined) {
+        if (currModel.player || currModel.mainBullet === true) {
             return;
         }
         //Get current model bounding boxes
@@ -593,7 +594,7 @@ function renderModels(time) {
         if (bullMinX <= curMaxX && bullMaxX >= curMinX) {
             if (bullMinY <= curMaxY && bullMaxY >= curMinY) {
                 if (bullMinZ <= curMaxZ && bullMaxZ >= curMinZ) {
-                    if (playerBullet.fired === true && currModel.material.alpha > 0.0) {
+                    if (playerBullet.fired === true && currModel.material.alpha > 0.0 && currModel.mainBullet === undefined) {
                         playerBullet.translation = vec3.clone(player.translation);
                         playerBullet.fired = false;
                         gameObjects.splice(numaliens + 2 + index * 3, 3); //Delete alien bullets

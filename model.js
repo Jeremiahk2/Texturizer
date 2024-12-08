@@ -213,6 +213,8 @@ class SpaceshipModel extends CubeObject {
 class BulletModel extends CubeObject {
     texture = "https://jeremiahk2.github.io/textures.github.io/White-1.jpg"
 
+    mainBullet = false;
+
     scaling = vec3.fromValues(.01, .08, .01);
 
     fired = false;
