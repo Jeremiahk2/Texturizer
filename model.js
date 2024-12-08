@@ -69,6 +69,11 @@ class AlienModel extends CubeObject {
     phase = Math.PI / 4;
     descendingMovement = vec3.fromValues(0, -.25, 0);
 
+    //Bullet physics
+    bullets = [];
+    shot = -1;
+    shotTime = 0;
+
     //Returning movement
     returningSeparation = 1;
     currentSeparation = 1;
@@ -86,14 +91,19 @@ class AlienModel extends CubeObject {
 
     handleReturningMovement(elapsed) {
         this.standardMovement();
-        let timeStepVector = vec3.fromValues(0, elapsed * 1.75, 0);
+        let timeStepVector = vec3.fromValues(0, elapsed * 1.25, 0);
         vec3.subtract(this.translation, this.translation, timeStepVector);
 
         if ( this.translation[1] <= this.translationLimitMin[1]) {
-            console.log(timeStepVector);
             console.log("Returned");
             this.state = 0;
+            this.shot = -1;
             this.translation[1] = this.translationLimitMin[1];
+        }
+        for (let i = 0 ; i < this.bullets.length; i++) {
+            if (i > this.shot) {
+                vec3.copy(this.bullets[i].translation, this.translation);
+            }
         }
     }
 
@@ -117,8 +127,17 @@ class AlienModel extends CubeObject {
             vec3.add(this.translation, this.translation, vec3.fromValues(AlienModel.position, 0, 0));
             const returningVector = vec3.fromValues(0, this.returningSeparation, 0);
             vec3.add(this.translation, this.translation, returningVector);
+            this.bullets.forEach(bullet => {
+                vec3.copy(bullet.translation, this.translation);
+            })
             // this.handleReturningMovement(elapsed);
             console.log("Returning");
+        }
+
+        for (let i = 0 ; i < this.bullets.length; i++) {
+            if (i > this.shot) {
+                vec3.copy(this.bullets[i].translation, this.translation);
+            }
         }
     }
 
@@ -164,6 +183,11 @@ class AlienModel extends CubeObject {
         }
         else {
             vec3.add(this.translation, this.translation, AlienModel.standardMovement);
+        }
+        for (let i = 0 ; i < this.bullets.length; i++) {
+            if (i > this.shot) {
+                vec3.copy(this.bullets[i].translation, this.translation);
+            }
         }
 
     }

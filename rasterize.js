@@ -15,6 +15,7 @@ const ALIENS_PER_ROW = 6;
 const ALIEN_SPACING = .2;
 const ALIEN_START_X = -1.0;
 const ALIEN_START_Y = -.0
+let numaliens = 12;
 
 const SPACESHIP_START = vec3.fromValues(-.5, -.9, 0.0);
 
@@ -67,23 +68,6 @@ function translatePlayer(offset) {
 function translateObject(offset, object) {
     vec3.add(object.translation,object.translation,offset);
 }
-
-// function rotateModel(axis,direction) {
-//     if (handleKeyDown.modelOn != null) {
-//         let newRotation = mat4.create();
-//
-//         mat4.fromRotation(newRotation,direction*rotateTheta,axis); // get a rotation matrix around passed axis
-//         vec3.transformMat4(handleKeyDown.modelOn.xAxis,handleKeyDown.modelOn.xAxis,newRotation); // rotate model x axis tip
-//         vec3.transformMat4(handleKeyDown.modelOn.yAxis,handleKeyDown.modelOn.yAxis,newRotation); // rotate model y axis tip
-//     } // end if there is a highlighted model
-// } // end rotate model
-// function highlightModel(modelType,whichModel) {
-//     if (handleKeyDown.modelOn != null)
-//         handleKeyDown.modelOn.on = false;
-//     handleKeyDown.whichOn = whichModel;
-//     handleKeyDown.modelOn = gameObjects[whichModel];
-//     handleKeyDown.modelOn.on = true;
-// } // end highlight model
 
 // does stuff when keys are pressed
 function handleKeyDown(event) {
@@ -233,7 +217,7 @@ let gameObjects = [];
 
 function  createObjects() {
     gameObjects = [];
-
+    //Add aliens
     let currentY = ALIEN_START_Y;
     for (let i = 0; i < ALIEN_ROWS; i++) {
         let currentX = ALIEN_START_X;
@@ -245,11 +229,21 @@ function  createObjects() {
         }
         currentY -= ALIEN_SPACING;
     }
-    player.translation = SPACESHIP_START;
+    //Add player
+    vec3.copy(player.translation, SPACESHIP_START);
     gameObjects.push(player);
 
-    playerBullet.translation = vec3.fromValues(-.5, -.9, 0.0);
+    vec3.copy(playerBullet.translation, SPACESHIP_START);
     gameObjects.push(playerBullet);
+    //Add alien bullets
+    for (let i = 0; i < numaliens; i++) {
+        for (let j = 0; j < 3; j++) {
+            let alienBullet = new BulletModel();
+            vec3.copy(alienBullet.translation, gameObjects[i].translation);
+            gameObjects.push(alienBullet);
+            gameObjects[i].bullets.push(alienBullet);
+        }
+    }
 }
 
 // read models in, load them into webgl buffers
@@ -590,8 +584,10 @@ function renderModels(time) {
                     if (playerBullet.fired === true && currModel.material.alpha > 0.0) {
                         playerBullet.translation = vec3.clone(player.translation);
                         playerBullet.fired = false;
-                        gameObjects.splice(index, 1);
-                        textures.splice(index, 1);
+                        gameObjects.splice(numaliens + 2 + index * 3, 3); //Delete alien bullets
+                        gameObjects.splice(index, 1); //Delete alien
+                        numaliens--;
+                        textures.splice(index, 1); //Delete alien texture
                         console.log("Bullet-Alien collision detected Detected");
                     }
                 }
@@ -662,11 +658,11 @@ function renderModels(time) {
         gl.vertexAttribPointer(vPosAttribLoc,3,gl.FLOAT,false,0,0); // feed
         gl.bindBuffer(gl.ARRAY_BUFFER,normalBuffers[whichTriSet]); // activate
         gl.vertexAttribPointer(vNormAttribLoc,3,gl.FLOAT,false,0,0); // feed
-        gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffers[whichTriSet]);
+        gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffers[Math.min(13, whichTriSet)]);
         gl.vertexAttribPointer(texCoordLoc,2,gl.FLOAT,false,0,0); // feed
-        gl.activeTexture(gl.TEXTURE0 + whichTriSet);
-        gl.bindTexture(gl.TEXTURE_2D, textures[whichTriSet]);
-        gl.uniform1i(uSampler, whichTriSet);
+        gl.activeTexture(gl.TEXTURE0 + Math.min(13, whichTriSet));
+        gl.bindTexture(gl.TEXTURE_2D, textures[Math.min(13, whichTriSet)]);
+        gl.uniform1i(uSampler, Math.min(numaliens + 1, whichTriSet));
 
         if (currSet.material.alpha <= .5) {
             if (numTransparent === 0) {
@@ -711,7 +707,7 @@ function renderModels(time) {
 
     //Handle physics
 
-    //Handle bullet physics
+    //Handle player bullet physics
     if (playerBullet.fired === true) {
 
         let temp = vec4.create();
@@ -728,10 +724,19 @@ function renderModels(time) {
             translateObject(vec3.fromValues(0, elapsed * 1.5, 0), playerBullet);
         }
     }
+    //Handle alien bullet physics
+    gameObjects.forEach(model => {
+        if (model.shot > -1 && model.state === 1) {
+            for (let i = 0; i <= model.shot; i++) {
+                let movement = vec3.fromValues(0, -elapsed * 1.5, 0);
+                vec3.add(model.bullets[i].translation, model.bullets[i].translation, movement);
+            }
+        }
+    });
 
-    //Descend an alien every second
+    //Descend an alien every few seconds
     if (time - lastDropTime >= 3000) {
-        let alienIndex = Math.random() * (gameObjects.length - 2)
+        let alienIndex = Math.random() * (numaliens)
         alienIndex = Math.floor(alienIndex);
         if (gameObjects[alienIndex].state === 0) {
             gameObjects[alienIndex].state = 1;
@@ -740,8 +745,12 @@ function renderModels(time) {
         lastDropTime = time;
     }
 
-    //Handle Alien Standard movement
+
+    //Handle Alien movement
     AlienModel.setStandardMovement(elapsed);
+
+    let shootingRange = .2;
+
     gameObjects.forEach(model => {
         if (model.translationLimitMax !== undefined) {
             if (model.state === 0) {
@@ -752,6 +761,17 @@ function renderModels(time) {
             }
             else if (model.state === 2) {
                 model.handleReturningMovement(elapsed)
+            }
+
+            if (model.state === 1 && model.shot < 2) {
+                let alien = vec4.create();
+                vec4.transformMat4(alien, model.backTopRight, model.mMatrix);
+
+                if (alien[1] < shootingRange && time - model.shotTime >= 1000) {
+                    model.shot++;
+                    model.shotTime = time;
+                    console.log("Shooting");
+                }
             }
         }
     })
