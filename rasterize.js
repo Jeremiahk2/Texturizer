@@ -28,7 +28,6 @@ let background = "https://ncsucgclass.github.io/prog4/stars.jpg";
 
 /* webgl and geometry data */
 let gl = null; // the all powerful gl object. It's all here folks!
-let numTriangleSets = 0; // how many triangle sets in input scene
 let vertexBuffers = []; // this contains vertex coordinate lists by set, in triples
 let normalBuffers = []; // this contains normal component lists by set, in triples
 let textureBuffers = [];
@@ -265,7 +264,6 @@ function loadModels() {
             let minCorner = vec3.fromValues(Number.MAX_VALUE,Number.MAX_VALUE,Number.MAX_VALUE); // other corner
         
             // process each triangle set to load webgl vertex and triangle buffers
-            numTriangleSets = gameObjects.length; // remember how many tri sets
             for (let whichSet=0; whichSet<gameObjects.length; whichSet++) { // for each tri set
                 
                 // set up hilighting, modeling translation and rotation
@@ -529,7 +527,6 @@ function renderModels(time) {
         mat4.multiply(mMatrix,mat4.fromTranslation(temp,currModel.translation),mMatrix); // T(pos)*T(ctr)*R(ax)*S(1.2)*T(-ctr)
 
     } // end make model transform
-
     function checkCollisions(currModel, index) {
         if (currModel.player || currModel.fired !== undefined) {
             return;
@@ -573,7 +570,22 @@ function renderModels(time) {
         if (playMinX <= curMaxX && playMaxX >= curMinX) {
             if (playMinY <= curMaxY && playMaxY >= curMinY) {
                 if (playMinZ <= curMaxZ && playMaxZ >= curMinZ) {
-                    console.log("Player-Alien collision detected Detected");
+                    numaliens = 12;
+                    AlienModel.position = 0.0;
+                    AlienModel.upperLimit = .4;
+                    AlienModel.lowerLimit = -.4;
+                    AlienModel.speed = new vec3.fromValues(-.5, 0, 0);
+                    AlienModel.color = [1, 1, 1];
+                    AlienModel.reset = false;
+                    AlienModel.standardMovement = vec3.create();
+                    createObjects();
+                    loadModels(); // load in the models from tri file
+                    setupShaders(); // setup the webGL shaders
+                    textures = [];
+                    for (let i = 0; i < gameObjects.length; i++) {
+                        textures[i] = loadTexture(gl, gameObjects[i].texture);
+                    }
+                    return true; //No need to continue, game is over.
                 }
             }
         }
@@ -658,10 +670,10 @@ function renderModels(time) {
         gl.vertexAttribPointer(vPosAttribLoc,3,gl.FLOAT,false,0,0); // feed
         gl.bindBuffer(gl.ARRAY_BUFFER,normalBuffers[whichTriSet]); // activate
         gl.vertexAttribPointer(vNormAttribLoc,3,gl.FLOAT,false,0,0); // feed
-        gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffers[Math.min(13, whichTriSet)]);
+        gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffers[Math.min(numaliens+1, whichTriSet)]);
         gl.vertexAttribPointer(texCoordLoc,2,gl.FLOAT,false,0,0); // feed
-        gl.activeTexture(gl.TEXTURE0 + Math.min(13, whichTriSet));
-        gl.bindTexture(gl.TEXTURE_2D, textures[Math.min(13, whichTriSet)]);
+        gl.activeTexture(gl.TEXTURE0 + Math.min(numaliens + 1, whichTriSet));
+        gl.bindTexture(gl.TEXTURE_2D, textures[Math.min(numaliens+1, whichTriSet)]);
         gl.uniform1i(uSampler, Math.min(numaliens + 1, whichTriSet));
 
         if (currSet.material.alpha <= .5) {
@@ -698,11 +710,6 @@ function renderModels(time) {
         if (playerBullet.fired === false) {
             playerBullet.fired = true;
         }
-    }
-
-    //Check and handle collisions
-    for (let i = gameObjects.length - 1; i >= 0; i--) {
-        checkCollisions(gameObjects[i], i);
     }
 
     //Handle physics
@@ -775,6 +782,14 @@ function renderModels(time) {
             }
         }
     })
+
+    //Check and handle collisions
+    for (let i = gameObjects.length - 1; i >= 0; i--) {
+        let result = checkCollisions(gameObjects[i], i);
+        if (result === true) {
+            i = -1;
+        }
+    }
 
 
 
