@@ -795,7 +795,7 @@ function renderModels(time) {
                 let alien = vec4.create();
                 vec4.transformMat4(alien, model.backTopRight, model.mMatrix);
 
-                if (alien[1] < shootingRange && time - model.shotTime >= 1000) {
+                if (alien[1] < shootingRange && time - model.shotTime >= 750) {
                     model.shot++;
                     model.shotTime = time;
                     console.log("Shooting");
