@@ -709,10 +709,22 @@ function renderModels(time) {
         if (playerLeftBound[0] > -0.9) {
             translatePlayer(vec3.fromValues(elapsed * -1.5, 0, 0));
         }
+        else if (AlienModel.alternate === true) {
+            player.translation[0] += 1.8;
+            if (playerBullet.fired === false) {
+                playerBullet.translation[0] += 1.8;
+            }
+        }
     }
     if (input[1] === 1) {//Translate right if D is pressed down
         if (playerRightBound[0] < 0.9) {
             translatePlayer(vec3.fromValues(elapsed * 1.5, 0, 0));
+        }
+        else if (AlienModel.alternate === true) {
+            player.translation[0] -= 1.8;
+            if (playerBullet.fired === false) {
+                playerBullet.translation[0] -= 1.8;
+            }
         }
     }
     if (input[2] === 1) {
