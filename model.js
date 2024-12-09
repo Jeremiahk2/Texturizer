@@ -51,6 +51,8 @@ class CubeObject {
 
 class AlienModel extends CubeObject {
 
+    static alternate = false;
+
     //State information
     state = 0; //0 = Standard, 1 = Descending, 2 = Returning
 
@@ -91,10 +93,18 @@ class AlienModel extends CubeObject {
 
     handleReturningMovement(elapsed) {
         this.standardMovement();
-        let timeStepVector = vec3.fromValues(0, elapsed * 1.25, 0);
+        let timeStepVector;
+        if (AlienModel.alternate === true) {
+            timeStepVector = vec3.fromValues(0, 0, -elapsed * 1.25);
+        }
+        else {
+            timeStepVector = vec3.fromValues(0, elapsed * 1.25, 0);
+        }
+
         vec3.subtract(this.translation, this.translation, timeStepVector);
 
-        if ( this.translation[1] <= this.translationLimitMin[1]) {
+        if ( AlienModel.alternate === false && this.translation[1] <= this.translationLimitMin[1] ||
+            AlienModel.alternate === true && this.translation[2] >= this.translationLimitMin[2]) {
             console.log("Returned");
             this.state = 0;
             this.shot = -1;
@@ -125,7 +135,14 @@ class AlienModel extends CubeObject {
             vec3.copy(this.translation, this.translationLimitMin);
             vec3.add(this.translation, this.translation, vec3.fromValues(AlienModel.upperLimit, 0, 0));
             vec3.add(this.translation, this.translation, vec3.fromValues(AlienModel.position, 0, 0));
-            const returningVector = vec3.fromValues(0, this.returningSeparation, 0);
+            //add separation.
+            let returningVector;
+            if (AlienModel.alternate === true) {
+                returningVector = vec3.fromValues(0, 0, -this.returningSeparation * 2);
+            }
+            else {
+                returningVector = vec3.fromValues(0, this.returningSeparation, 0);
+            }
             vec3.add(this.translation, this.translation, returningVector);
             this.bullets.forEach(bullet => {
                 vec3.copy(bullet.translation, this.translation);

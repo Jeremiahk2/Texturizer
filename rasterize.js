@@ -57,6 +57,24 @@ let Up = vec3.clone(defaultUp); // view up vector in world space
 //Texture buffers
 let textures = [];
 
+function reset() {
+    numaliens = 12;
+    AlienModel.position = 0.0;
+    AlienModel.upperLimit = .4;
+    AlienModel.lowerLimit = -.4;
+    AlienModel.speed = new vec3.fromValues(-.5, 0, 0);
+    AlienModel.color = [1, 1, 1];
+    AlienModel.reset = false;
+    AlienModel.standardMovement = vec3.create();
+    createObjects();
+    loadModels(); // load in the models from tri file
+    setupShaders(); // setup the webGL shaders
+    textures = [];
+    for (let i = 0; i < gameObjects.length; i++) {
+        textures[i] = loadTexture(gl, gameObjects[i].texture);
+    }
+}
+
 function translatePlayer(offset) {
     vec3.add(player.translation,player.translation,offset);
     if (playerBullet.fired === false) {
@@ -71,7 +89,6 @@ function translateObject(offset, object) {
 // does stuff when keys are pressed
 function handleKeyDown(event) {
     switch (event.code) {
-            
         // model transformation
         case "KeyA": // translate left, rotate left with shift
             input[0] = 1;
@@ -82,6 +99,11 @@ function handleKeyDown(event) {
         case "Space":
             input[2] = 1;
             break;
+        case "Digit1":
+            if (event.getModifierState("Shift") && AlienModel.alternate === false) {
+                AlienModel.alternate = true;
+                reset();
+            }
     } // end switch
 } // end handleKeyDown
 
@@ -571,21 +593,7 @@ function renderModels(time) {
         if (playMinX <= curMaxX && playMaxX >= curMinX) {
             if (playMinY <= curMaxY && playMaxY >= curMinY) {
                 if (playMinZ <= curMaxZ && playMaxZ >= curMinZ) {
-                    numaliens = 12;
-                    AlienModel.position = 0.0;
-                    AlienModel.upperLimit = .4;
-                    AlienModel.lowerLimit = -.4;
-                    AlienModel.speed = new vec3.fromValues(-.5, 0, 0);
-                    AlienModel.color = [1, 1, 1];
-                    AlienModel.reset = false;
-                    AlienModel.standardMovement = vec3.create();
-                    createObjects();
-                    loadModels(); // load in the models from tri file
-                    setupShaders(); // setup the webGL shaders
-                    textures = [];
-                    for (let i = 0; i < gameObjects.length; i++) {
-                        textures[i] = loadTexture(gl, gameObjects[i].texture);
-                    }
+                    reset();
                     return true; //No need to continue, game is over.
                 }
             }
