@@ -1,2 +1,2 @@
 # Texturizer
-Learning WebGL textures!
+Learning WebGL with textures!
